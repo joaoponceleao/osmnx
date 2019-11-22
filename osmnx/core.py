@@ -98,7 +98,7 @@ def get_from_cache(url):
             log('Retrieved response from cache file "{}" for URL "{}"'.format(cache_path_filename, url))
             return response_json
 
-            
+
 def get_http_headers(user_agent=None, referer=None):
     """
     Update the default requests HTTP headers with OSMnx info.
@@ -114,15 +114,15 @@ def get_http_headers(user_agent=None, referer=None):
     -------
     headers : dict
     """
-    
+
     if user_agent is None:
         user_agent = 'Python OSMnx package (https://github.com/gboeing/osmnx)'
     if referer is None:
         referer = 'Python OSMnx package (https://github.com/gboeing/osmnx)'
-        
+
     headers = requests.utils.default_headers()
     headers.update({'User-Agent': user_agent, 'referer': referer})
-    return headers            
+    return headers
 
 
 def get_pause_duration(recursive_delay=5, default_duration=10):
@@ -452,7 +452,9 @@ def get_osm_filter(network_type):
     Parameters
     ----------
     network_type : string
-        {'walk', 'bike', 'drive', 'drive_service', 'all', 'all_private', 'none'} what type of street or other network to get
+        {'none', 'bike', 'all_public', 'all', 'private_only', 'pedestrian_only',
+        'pedestrian_use', 'vehicle_only', 'vehicle_use', 'shared_use'}
+        what type of street or other network to get
 
     Returns
     -------
@@ -460,38 +462,70 @@ def get_osm_filter(network_type):
     """
     filters = {}
 
-    # driving: filter out un-drivable roads, service roads, private ways, and anything specifying motor=no
-    # also filter out any non-service roads that are tagged as providing parking, driveway, private, or emergency-access services
-    filters['drive'] = ('["area"!~"yes"]["highway"!~"cycleway|footway|path|pedestrian|steps|track|'
-                        'proposed|construction|bridleway|abandoned|platform|raceway|service"]'
-                        '["motor_vehicle"!~"no"]["motorcar"!~"no"]["access"!~"private"]'
-                        '["service"!~"parking|parking_aisle|driveway|private|emergency_access"]')
+    # bike
+    filters['bike'] = (
+        '["area"!~"yes"]["highway"!~"footway|motor|proposed|construction|'
+        'abandoned|platform|raceway"]["bicycle"!~"no"]["service"!~"private"]'
+        '["access"!~"private"]'
+    )
 
-    # drive+service: allow ways tagged 'service' but filter out certain types of service ways
-    filters['drive_service'] = ('["area"!~"yes"]["highway"!~"cycleway|footway|path|pedestrian|steps|track|'
-                                'proposed|construction|bridleway|abandoned|platform|raceway"]'
-                                '["motor_vehicle"!~"no"]["motorcar"!~"no"]["access"!~"private"]'
-                                '["service"!~"parking|parking_aisle|private|emergency_access"]')
+    # all_public
+    filters['all_public'] = (
+        '["area"!~"yes"]["highway"!~"proposed|construction|abandoned|platform|'
+        'raceway"]["service"!~"private"]["access"!~"private"]'
+    )
 
-    # walking: filter out cycle ways, motor ways, private ways, and anything specifying foot=no
-    # allow service roads, permitting things like parking lot lanes, alleys, etc that you *can* walk on even if they're not exactly nice walks
-    filters['walk'] = ('["area"!~"yes"]["highway"!~"cycleway|motor|proposed|construction|abandoned|platform|raceway"]'
-                       '["foot"!~"no"]["service"!~"private"]["access"!~"private"]')
+    # all (including private)
+    filters['all'] = (
+        '["area"!~"yes"]["highway"!~"proposed|construction|abandoned|platform|'
+        'raceway"]'
+    )
 
-    # biking: filter out foot ways, motor ways, private ways, and anything specifying biking=no
-    filters['bike'] = ('["area"!~"yes"]["highway"!~"footway|motor|proposed|construction|abandoned|platform|raceway"]'
-                       '["bicycle"!~"no"]["service"!~"private"]["access"!~"private"]')
+    # private_only
+    filters['private_only'] = (
+        '["area"!~"yes"]["highway"!~"proposed|construction|abandoned|platform|'
+        'raceway"]["access"~"private"]'
+    )
 
-    # to download all ways, just filter out everything not currently in use or that is private-access only
-    filters['all'] = ('["area"!~"yes"]["highway"!~"proposed|construction|abandoned|platform|raceway"]'
-                      '["service"!~"private"]["access"!~"private"]')
+    # pedestrian_only:
+    filters['pedestrian_only'] = (
+        '["area"!~"yes"]["highway"~"pedestrian|footway|steps|path|cycleway|'
+        'bridleway"]["motor_vehicle"="no"]["motorcar"="no"]["foot"!~"no"]'
+    )
 
-    # to download all ways, including private-access ones, just filter out everything not currently in use
-    filters['all_private'] = '["area"!~"yes"]["highway"!~"proposed|construction|abandoned|platform|raceway"]'
-    
+    # pedestrian_use:
+    filters['pedestrian_use'] = (
+        '["area"!~"yes"]["highway"~"primary|secondary|tertiary|unclassified|'
+        'residential|track|service|living_street|pedestrian|footway|steps|'
+        'path|cycleway|bridleway"]["foot"!~"no"]'
+    )
+
+    # vehicle_only
+    filters['vehicle_only'] = (
+        '["area"!~"yes"]["highway"~"motorway|trunk"]'
+        '["motor_vehicle"!~"no"]["motorcar"!~"no"]["foot"!~"yes"]'
+        '["service"!~"parking|parking_aisle|driveway|emergency_access"]'
+    )
+
+    # vehicle_use
+    filters['vehicle_use'] = (
+        '["area"!~"yes"]["highway"~"motorway|trunk|primary|secondary|tertiary|'
+        'unclassified|residential|track|service|living_street"]'
+        '["motor_vehicle"!~"no"]["motorcar"!~"no"]["service"!~"parking|'
+        'parking_aisle|driveway|emergency_access"]'
+    )
+
+    # shared_use
+    filters['shared_use'] = (
+        '["area"!~"yes"]["highway"~"primary|secondary|tertiary|unclassified|'
+        'residential|track|service|living_street"]'
+        '["motor_vehicle"!~"no"]["motorcar"!~"no"]["foot"!~"no"]'
+        '["service"!~"parking|parking_aisle|driveway|emergency_access"]'
+    )
+
     # no filter, needed for infrastructures other than "highway"
     filters['none'] = ''
-    
+
     if network_type in filters:
         osm_filter = filters[network_type]
     else:
@@ -517,7 +551,8 @@ def osm_net_download(polygon=None, north=None, south=None, east=None, west=None,
     west : float
         western longitude of bounding box
     network_type : string
-        {'walk', 'bike', 'drive', 'drive_service', 'all', 'all_private'} what type of street network to get
+        {'none', 'bike', 'all_public', 'all', 'private_only', 'pedestrian_only',
+        'pedestrian_use', 'vehicle_only', 'vehicle_use', 'shared_use'} what type of street network to get
     timeout : int
         the timeout interval for requests and to pass to API
     memory : int
@@ -526,14 +561,13 @@ def osm_net_download(polygon=None, north=None, south=None, east=None, west=None,
         max area for any part of the geometry, in the units the geometry is in: any polygon bigger will get divided up
         for multiple queries to API (default is 50,000 * 50,000 units (ie, 50km x 50km in area, if units are meters))
     infrastructure : string
-        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other 
+        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other
         infrastructures may be selected like power grids (ie, 'way["power"~"line"]'))
-    
+
     Returns
     -------
     dict
     """
-
     # check if we're querying by polygon or by bounding box based on which argument(s) where passed into this function
     by_poly = not polygon is None
     by_bbox = not (north is None or south is None or east is None or west is None)
@@ -986,16 +1020,16 @@ def truncate_graph_polygon(G, polygon, retain_all=False, truncate_by_edge=False,
     retain_all : bool
         if True, return the entire graph even if it is not connected
     truncate_by_edge : bool
-        if True retain node if it's outside polygon but at least one of node's neighbors 
+        if True retain node if it's outside polygon but at least one of node's neighbors
         are within polygon (NOT CURRENTLY IMPLEMENTED)
     quadrat_width : numeric
-        passed on to intersect_index_quadrats: the linear length (in degrees) of the quadrats 
+        passed on to intersect_index_quadrats: the linear length (in degrees) of the quadrats
         with which to cut up the geometry (default = 0.025, approx 2km at NYC's latitude)
     min_num : int
-        passed on to intersect_index_quadrats: the minimum number of linear quadrat lines 
+        passed on to intersect_index_quadrats: the minimum number of linear quadrat lines
         (e.g., min_num=3 would produce a quadrat grid of 4 squares)
     buffer_amount : numeric
-        passed on to intersect_index_quadrats: buffer the quadrat grid lines by 
+        passed on to intersect_index_quadrats: buffer the quadrat grid lines by
         quadrat_width times buffer_amount
 
     Returns
@@ -1108,7 +1142,8 @@ def add_paths(G, paths, network_type):
     paths : dict
         the paths from OSM
     network_type : string
-        {'all', 'walk', 'drive', etc}, what type of network
+        {'none', 'bike', 'all_public', 'all', 'private_only', 'pedestrian_only',
+        'pedestrian_use', 'vehicle_only', 'vehicle_use', 'shared_use'}, what type of network
 
     Returns
     -------
@@ -1120,15 +1155,16 @@ def add_paths(G, paths, network_type):
 
     for data in paths.values():
 
-        # if this path is tagged as one-way and if it is not a walking network, then we'll add the path in one direction only
-        if ('oneway' in data and data['oneway'] in osm_oneway_values) and not network_type=='walk':
+        # if this path is tagged as one-way and if it is not a pedestrian network, then we'll add the path in one direction only
+        if (('oneway' in data and data['oneway'] in osm_oneway_values) and
+                network_type not in ('pedestrian_only', 'pedestrian_use')):
             if data['oneway'] == '-1':
                 # paths with a one-way value of -1 are one-way, but in the reverse direction of the nodes' order, see osm documentation
                 data['nodes'] = list(reversed(data['nodes']))
             # add this path (in only one direction) to the graph
             add_path(G, data, one_way=True)
 
-        # else, this path is not tagged as one-way or it is a walking network (you can walk both directions on a one-way street)
+        # else, this path is not tagged as one-way or it is a pedestrian network (you can walk both directions on a one-way street)
         else:
             # add this path (in both directions) to the graph and set its 'oneway' attribute to False
             # if this is a walking network, this may very well be a one-way street (as cars/bikes go), but in a walking-only network it is a bi-directional edge
@@ -1269,7 +1305,7 @@ def graph_from_bbox(north, south, east, west, network_type='all_private', simpli
         if True (and simplify=True), buffer 0.5km to get a graph larger than requested,
         then simplify, then truncate it to requested spatial extent
     infrastructure : string
-        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other 
+        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other
         infrastructures may be selected like power grids (ie, 'way["power"~"line"]'))
 
     Returns
@@ -1352,7 +1388,7 @@ def graph_from_point(center_point, distance=1000, distance_type='bbox', network_
         if True (and simplify=True), buffer 0.5km to get a graph larger than requested,
         then simplify, then truncate it to requested spatial extent
     infrastructure : string
-        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other 
+        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other
         infrastructures may be selected like power grids (ie, 'way["power"~"line"]'))
 
     Returns
@@ -1416,7 +1452,7 @@ def graph_from_address(address, distance=1000, distance_type='bbox', network_typ
         if True (and simplify=True), buffer 0.5km to get a graph larger than requested,
         then simplify, then truncate it to requested spatial extent
     infrastructure : string
-        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other 
+        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other
         infrastructures may be selected like power grids (ie, 'way["power"~"line"]'))
 
     Returns
@@ -1468,9 +1504,9 @@ def graph_from_polygon(polygon, network_type='all_private', simplify=True, retai
         if True (and simplify=True), buffer 0.5km to get a graph larger than requested,
         then simplify, then truncate it to requested spatial extent
     infrastructure : string
-        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other 
+        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other
         infrastructures may be selected like power grids (ie, 'way["power"~"line"]'))
-        
+
     Returns
     -------
     networkx multidigraph
@@ -1527,13 +1563,13 @@ def graph_from_place(query, network_type='all_private', simplify=True, retain_al
                      truncate_by_edge=False, name='unnamed', which_result=1, buffer_dist=None, timeout=180, memory=None, max_query_area_size=50*1000*50*1000, clean_periphery=True, infrastructure='way["highway"]'):
     """
     Create a networkx graph from OSM data within the spatial boundaries of some geocodable place(s).
-    
+
     The query must be geocodable and OSM must have polygon boundaries for the geocode result. If OSM
     does not have a polygon for this place, you can instead get its street network using the
     graph_from_address function, which geocodes the place name to a point and gets the network within
     some distance of that point. Alternatively, you might try to vary the which_result parameter to
     use a different geocode result. For example, the first geocode result (ie, the default) might
-    resolve to a point geometry, but the second geocode result for this query might resolve to a 
+    resolve to a point geometry, but the second geocode result for this query might resolve to a
     polygon, in which case you can use graph_from_place with which_result=2.
 
     Parameters
@@ -1564,9 +1600,9 @@ def graph_from_place(query, network_type='all_private', simplify=True, retain_al
         if True (and simplify=True), buffer 0.5km to get a graph larger than requested,
         then simplify, then truncate it to requested spatial extent
     infrastructure : string
-        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other 
+        download infrastructure of given type (default is streets (ie, 'way["highway"]') but other
         infrastructures may be selected like power grids (ie, 'way["power"~"line"]'))
-        
+
     Returns
     -------
     networkx multidigraph
